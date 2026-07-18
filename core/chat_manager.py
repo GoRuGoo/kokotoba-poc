@@ -1,47 +1,31 @@
-from __future__ import annotations
-
-from ai.embedding import EmbeddingService
-from ai.llm import LLM, MockLLM
-from config.settings import AppSettings, get_settings
-from core.card_generator import CardGenerator
-from core.memory_consolidator import MemoryConsolidator
-from core.rag_retriever import RAGRetriever
-from database.database import Database
-from database.repository import Repository
-from models.conversation import Conversation
-from models.card import SuggestionCard
+from database import DatabaseManager
+from memory.memory_consolidator import MemoryConsolidator, ShortTermMemoryRecord, Location
+from time import datetime
 
 
 class ChatManager:
-    def __init__(
-        self,
-        settings: AppSettings | None = None,
-        llm: LLM | None = None,
-        embedding_service: EmbeddingService | None = None,
-        repository: Repository | None = None,
-    ) -> None:
-        self.settings = settings or get_settings()
-        self.database = Database(self.settings.database_path)
-        self.repository = repository or Repository(self.database)
-        self.embedding_service = embedding_service or EmbeddingService(
-            dimension=self.settings.embedding_dimension)
-        self.llm = llm or MockLLM()
-        self.memory_llm = MockLLM()
-        self.retriever = RAGRetriever(
-            self.repository, self.embedding_service, top_k=self.settings.top_k)
-        self.card_generator = CardGenerator(None)
-        self.memory_consolidator = MemoryConsolidator(
-            self.memory_llm, self.embedding_service, self.repository)
-        self.conversation = Conversation()
 
-    def handle_user_input(self, user_input: str) -> list[SuggestionCard]:
-        self.conversation.add_message("user", user_input)
-        memories = self.retriever.retrieve(user_input)
-        cards = self.card_generator.generate(user_input, memories)
-        assistant_summary = " / ".join(card.title for card in cards)
-        self.conversation.add_message("assistant", assistant_summary)
-        return cards
+    def __init__(self, db_manager: DatabaseManager) -> None:
+        self.db_manager = db_manager
+        pass
+
+    def handle_user_input(self, user_input: str, user_location_input: str) -> list[str]:
+        # 短期記憶に会話内容を保存
+        self.memory_consolidator.record_short_term_memory(
+            ShortTermMemoryRecord(
+                conversation_text=user_input,
+                timestamp=datetime.now(),
+                location=Location(
+                    latitude=0.0,          # 必要に応じて実際の緯度
+                    longitude=0.0,         # 必要に応じて実際の経度
+                    place_name=user_location_input,
+                ),
+                speaker="user",
+            )
+        )
 
     def finish_session(self) -> None:
-        self.repository.save_conversation(self.conversation)
-        self.memory_consolidator.consolidate(self.conversation)
+        return
+
+    def _build_card(self, user_input: str, user_location_input: str) -> str:
+        return f"{user_input} / {user_location_input}"
