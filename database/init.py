@@ -16,8 +16,18 @@ class DatabaseManager:
     def connect(self):
         conn = sqlite3.connect(self.path)
         conn.row_factory = sqlite3.Row
+
         # SQLiteではデフォルトで無効なので有効化
         conn.execute("PRAGMA foreign_keys = ON")
+
+        # sqlite-vecをロード
+        conn.enable_load_extension(True)
+
+        import sqlite_vec
+        sqlite_vec.load(conn)
+
+        conn.enable_load_extension(False)
+
         return conn
 
     def initialize(self):
