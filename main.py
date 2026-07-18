@@ -3,11 +3,12 @@ from database.init import DatabaseManager
 
 
 def main() -> None:
-    chat_manager = ChatManager()
     db_manager = DatabaseManager()
+    chat_manager = ChatManager(db_manager)
 
     # テーブル作成
     db_manager.initialize()
+    db_manager.insert_demo_data()
 
     while True:
         # 店員・医者からの入力と固定の地名を受け取る

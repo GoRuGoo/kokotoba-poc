@@ -1,6 +1,6 @@
-from database import DatabaseManager
+from database.init import DatabaseManager
 from memory.memory_consolidator import MemoryConsolidator, ShortTermMemoryRecord, Location
-from time import datetime
+from datetime import datetime
 
 
 class ChatManager:
