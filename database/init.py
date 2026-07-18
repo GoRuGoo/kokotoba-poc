@@ -1,36 +1,35 @@
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timedelta
-import random
-import sqlite3
-from pathlib import Path
+
+# Embedding計算用に追加
+import numpy as np
+from sentence_transformers import SentenceTransformer
 
 
 class DatabaseManager:
     def __init__(self):
         self.path = Path("data/app.sqlite3")
         self.path.parent.mkdir(parents=True, exist_ok=True)
-
         self.initialize()
 
     def connect(self):
         conn = sqlite3.connect(self.path)
         conn.row_factory = sqlite3.Row
-
         # SQLiteではデフォルトで無効なので有効化
         conn.execute("PRAGMA foreign_keys = ON")
-
         return conn
 
     def initialize(self):
         with self.connect() as conn:
-            # 長期記憶
+            # 長期記憶 (embedding BLOB を追加)
             conn.execute("""
             CREATE TABLE IF NOT EXISTS long_term_memory (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
 
                 summary TEXT NOT NULL,
                 source_text TEXT NOT NULL,
+                embedding BLOB,  -- 追加: ベクトルデータを保存するカラム
 
                 place_name TEXT,
                 latitude REAL,
@@ -38,8 +37,6 @@ class DatabaseManager:
 
                 speaker TEXT,
                 event_time DATETIME,
-
-                importance REAL DEFAULT 0.5,
 
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 modified_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -73,7 +70,6 @@ class DatabaseManager:
                     ON DELETE CASCADE
             )
             """)
-
             conn.commit()
 
     def insert_demo_data(self):
@@ -87,7 +83,6 @@ class DatabaseManager:
                 "longitude": 130.7606,
                 "speaker": "自分",
                 "days_ago": 2,
-                "importance": 0.8,
                 "tags": ["hospital", "health", "medicine", "sick"]
             },
             {
@@ -98,7 +93,6 @@ class DatabaseManager:
                 "longitude": 139.7938,
                 "speaker": "山田マネージャー",
                 "days_ago": 10,
-                "importance": 0.9,
                 "tags": ["work", "meeting", "ai", "project"]
             },
             {
@@ -109,7 +103,6 @@ class DatabaseManager:
                 "longitude": 130.3763,
                 "speaker": "自分",
                 "days_ago": 5,
-                "importance": 0.6,
                 "tags": ["sports", "running", "hobby", "achievement"]
             },
             {
@@ -120,7 +113,6 @@ class DatabaseManager:
                 "longitude": 135.7587,
                 "speaker": "駅アナウンス",
                 "days_ago": 20,
-                "importance": 0.7,
                 "tags": ["travel", "trouble", "train"]
             },
             {
@@ -131,7 +123,6 @@ class DatabaseManager:
                 "longitude": 139.7747,
                 "speaker": "店員さん",
                 "days_ago": 1,
-                "importance": 0.8,
                 "tags": ["shopping", "gadget", "pc"]
             },
             {
@@ -142,7 +133,6 @@ class DatabaseManager:
                 "longitude": 130.1583,
                 "speaker": "友人A",
                 "days_ago": 45,
-                "importance": 0.7,
                 "tags": ["drive", "food", "friends", "holiday"]
             },
             {
@@ -153,18 +143,16 @@ class DatabaseManager:
                 "longitude": 130.3956,
                 "speaker": "窓口担当者",
                 "days_ago": 60,
-                "importance": 0.9,
                 "tags": ["procedure", "moving", "government"]
             },
             {
                 "summary": "深夜の地震による一時避難",
                 "source_text": "深夜2時頃に震度4の地震が発生。スマホの緊急地震速報で飛び起きた。念のため防災リュックを持ってマンションのロビーまで一時避難したが、特に被害はなく30分後に部屋に戻った。",
                 "place_name": "自宅マンション",
-                "latitude": None,  # 場所が特定の施設でない・記録しない場合の例
+                "latitude": None,
                 "longitude": None,
                 "speaker": "自分",
                 "days_ago": 120,
-                "importance": 1.0,
                 "tags": ["emergency", "earthquake", "disaster"]
             },
             {
@@ -175,44 +163,54 @@ class DatabaseManager:
                 "longitude": 130.3541,
                 "speaker": "自分",
                 "days_ago": 15,
-                "importance": 0.5,
                 "tags": ["study", "qualification", "library"]
             }
         ]
 
+        print("Embeddingモデルを読み込んでいます（初回はダウンロードが発生します）...")
+        model = SentenceTransformer('intfloat/multilingual-e5-small')
+
+        # E5モデルの要件：保存するドキュメントには "passage: " を付ける
+        texts_to_embed = ["passage: " + r["source_text"] for r in demo_records]
+
+        print("Embeddingを計算しています...")
+        # encode にリストを渡すことで、一括（バッチ）で高速にベクトル化されます
+        embeddings = model.encode(texts_to_embed)
+
         with self.connect() as conn:
             cursor = conn.cursor()
 
-            for record in demo_records:
+            # データと計算済みのベクトルを同時にループ処理
+            for record, emb in zip(demo_records, embeddings):
                 # event_time の計算
                 event_time = (datetime.now(
                 ) - timedelta(days=record["days_ago"])).strftime("%Y-%m-%d %H:%M:%S")
 
-                # 1. long_term_memory の挿入
+                # ベクトル（numpy配列）を float32 のバイナリデータに変換
+                emb_bytes = emb.astype(np.float32).tobytes()
+
+                # 1. long_term_memory の挿入 (embedding を追加)
                 cursor.execute("""
                         INSERT INTO long_term_memory
-                        (summary, source_text, place_name, latitude, longitude, speaker, event_time, importance)
+                        (summary, source_text, embedding, place_name, latitude, longitude, speaker, event_time)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                     record["summary"],
                     record["source_text"],
+                    emb_bytes,           # 計算したバイナリデータをセット
                     record.get("place_name"),
                     record.get("latitude"),
                     record.get("longitude"),
                     record.get("speaker"),
-                    event_time,
-                    record["importance"]
+                    event_time
                 ))
 
                 memory_id = cursor.lastrowid
 
                 # 2. タグの処理とマッピング
                 for tag_name in record["tags"]:
-                    # タグが存在しない場合は挿入 (IGNOREを使って重複を回避)
                     cursor.execute(
                         "INSERT OR IGNORE INTO tags (name) VALUES (?)", (tag_name,))
-
-                    # タグIDを取得
                     cursor.execute(
                         "SELECT id FROM tags WHERE name = ?", (tag_name,))
                     tag_row = cursor.fetchone()
@@ -226,4 +224,4 @@ class DatabaseManager:
 
             # トランザクションのコミット
             conn.commit()
-            print(f"{len(demo_records)}件のユニークなデモデータを挿入しました。")
+            print(f"{len(demo_records)}件のユニークなデモデータを挿入し、Embeddingを保存しました。")

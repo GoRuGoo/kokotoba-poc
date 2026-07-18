@@ -8,7 +8,9 @@ def main() -> None:
 
     # テーブル作成
     db_manager.initialize()
+    print("データベースの初期化が完了しました。")
     db_manager.insert_demo_data()
+    print("デモデータの挿入が完了しました。")
 
     while True:
         # 店員・医者からの入力と固定の地名を受け取る
