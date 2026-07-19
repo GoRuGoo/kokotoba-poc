@@ -5,13 +5,13 @@ from llm import LLMClient, LiteRTLMClient
 
 def main() -> None:
     db_manager = DatabaseManager()
-    chat_manager = ChatManager(db_manager)
 
     llm_manager: LLMClient = LiteRTLMClient(
         "models/gemma-4-E2B-it.litertlm"
     )
 
     llm_manager.start()
+    chat_manager = ChatManager(db_manager, llm_manager)
 
     # テーブル作成
     db_manager.initialize()
@@ -21,9 +21,7 @@ def main() -> None:
 
     while True:
         # 店員・医者からの入力と固定の地名を受け取る
-        response = llm_manager.generate(
-            "日本の首都は?一文で完結に答えてください。アスタリスクなどの特殊記号はいりません。")
-        print(response)
+        print("talking start")
         user_input = input("Doctor: ").strip()
         user_location_input = input("Your location: ").strip()
 
@@ -31,7 +29,7 @@ def main() -> None:
             chat_manager.finish_session()
             break
 
-        cards = chat_manager.handle_user_input(user_input, user_location_input)
+        chat_manager.handle_user_input(user_input, user_location_input)
 
 
 if __name__ == "__main__":

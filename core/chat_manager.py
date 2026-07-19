@@ -1,15 +1,31 @@
-from database.init import DatabaseManager
-from memory.memory_consolidator import MemoryConsolidator, ShortTermMemoryRecord, Location
 from datetime import datetime
+
+from core.rag import RAG
+from database.init import DatabaseManager
+from llm.llm_client import LLMClient
+from memory.memory_consolidator import (
+    Location,
+    MemoryConsolidator,
+    ShortTermMemoryRecord,
+)
 
 
 class ChatManager:
 
-    def __init__(self, db_manager: DatabaseManager) -> None:
+    def __init__(
+        self,
+        db_manager: DatabaseManager,
+        llm_client: LLMClient,
+    ) -> None:
         self.db_manager = db_manager
-        pass
+        self.memory_consolidator = MemoryConsolidator(db_manager)
+        self.rag = RAG(llm_client, db_manager)
 
-    def handle_user_input(self, user_input: str, user_location_input: str) -> list[str]:
+    def handle_user_input(
+        self,
+        user_input: str,
+        user_location_input: str,
+    ) -> None:
         # 短期記憶に会話内容を保存
         self.memory_consolidator.record_short_term_memory(
             ShortTermMemoryRecord(
@@ -23,6 +39,8 @@ class ChatManager:
                 speaker="user",
             )
         )
+
+        self.rag.generate_rag_response(user_input, user_location_input)
 
     def finish_session(self) -> None:
         return
