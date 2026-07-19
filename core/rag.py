@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from database.long_term_memory_searcher import LongTermMemorySearcher
 from llm.llm_client import LLMClient
+from util.embedding import Embedding
 
 if TYPE_CHECKING:
     from database.init import DatabaseManager
@@ -18,10 +20,20 @@ class RAG:
     ) -> None:
         self.llm_client = llm_client
         self.db_manager = db_manager
+        self.embedding = Embedding()
+        self.long_term_memory_searcher = LongTermMemorySearcher(db_manager)
 
-    def generate_rag_response(self, user_input: str, user_location: str) -> None:
+    def generate_rag_response(
+        self,
+        user_input: str,
+        user_location: str,
+    ) -> str:
         expanded_query = self._query_expansion(user_input, user_location)
-        print(f"Expanded Query: {expanded_query}")
+        query_embedding = self.embedding.embed(expanded_query)
+        long_term_memory_result = self.long_term_memory_searcher.search(
+            query_embedding
+        )
+        print(f"長期記憶検索結果: {long_term_memory_result}")
 
     def _query_expansion(self, user_input: str, user_location: str) -> str:
         """抽象的な質問と場所を、長期記憶検索向けの文字列へ拡張する。"""
