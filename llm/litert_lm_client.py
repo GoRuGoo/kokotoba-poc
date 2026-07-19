@@ -25,6 +25,9 @@ class LiteRTLMClient(LLMClient):
         if self._engine is not None and self._conversation is not None:
             return
 
+        # LiteRT-LM の詳細な INFO ログを非表示にする。
+        litert_lm.set_min_log_severity(litert_lm.LogSeverity.ERROR)
+
         # 以前の初期化が途中で失敗した場合に残ったリソースも解放する。
         if self._engine is not None or self._conversation is not None:
             self.close()
