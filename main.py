@@ -1,10 +1,17 @@
 from core.chat_manager import ChatManager
 from database.init import DatabaseManager
+from llm import LLMClient, LiteRTLMClient
 
 
 def main() -> None:
     db_manager = DatabaseManager()
     chat_manager = ChatManager(db_manager)
+
+    llm_manager: LLMClient = LiteRTLMClient(
+        "models/gemma-4-E2B-it.litertlm"
+    )
+
+    llm_manager.start()
 
     # テーブル作成
     db_manager.initialize()
@@ -14,6 +21,9 @@ def main() -> None:
 
     while True:
         # 店員・医者からの入力と固定の地名を受け取る
+        response = llm_manager.generate(
+            "日本の首都は?一文で完結に答えてください。アスタリスクなどの特殊記号はいりません。")
+        print(response)
         user_input = input("Doctor: ").strip()
         user_location_input = input("Your location: ").strip()
 
