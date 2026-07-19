@@ -8,6 +8,11 @@ from sentence_transformers import SentenceTransformer
 
 
 class DatabaseManager:
+    EMBEDDING_MODEL_ID = "intfloat/multilingual-e5-small"
+    EMBEDDING_MODEL_PATH = Path(
+        "models/sentence-transformers/multilingual-e5-small"
+    )
+
     def __init__(self):
         self.path = Path("data/app.sqlite3")
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -177,8 +182,7 @@ class DatabaseManager:
             }
         ]
 
-        print("Embeddingモデルを読み込んでいます（初回はダウンロードが発生します）...")
-        model = SentenceTransformer('intfloat/multilingual-e5-small')
+        model = self._load_embedding_model()
 
         # E5モデルの要件：保存するドキュメントには "passage: " を付ける
         texts_to_embed = ["passage: " + r["source_text"] for r in demo_records]
@@ -235,3 +239,30 @@ class DatabaseManager:
             # トランザクションのコミット
             conn.commit()
             print(f"{len(demo_records)}件のユニークなデモデータを挿入し、Embeddingを保存しました。")
+
+    @classmethod
+    def _load_embedding_model(cls) -> SentenceTransformer:
+        """Embeddingモデルを初回だけ取得し、以降はローカルから読み込む。"""
+        completion_marker = cls.EMBEDDING_MODEL_PATH / ".download_complete"
+
+        if completion_marker.is_file():
+            print(
+                "保存済みのEmbeddingモデルを読み込んでいます: "
+                f"{cls.EMBEDDING_MODEL_PATH}"
+            )
+            return SentenceTransformer(
+                str(cls.EMBEDDING_MODEL_PATH),
+                local_files_only=True,
+            )
+
+        print(
+            "Embeddingモデルを初回ダウンロードしています: "
+            f"{cls.EMBEDDING_MODEL_ID}"
+        )
+        model = SentenceTransformer(cls.EMBEDDING_MODEL_ID)
+
+        cls.EMBEDDING_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+        model.save(str(cls.EMBEDDING_MODEL_PATH))
+        completion_marker.touch()
+        print(f"Embeddingモデルを保存しました: {cls.EMBEDDING_MODEL_PATH}")
+        return model

@@ -25,3 +25,4 @@ data/models/*.xnnpack_cache_*
 models/*.litertlm
 models/*.litertlm.xnnpack_cache_*
 models/*.xnnpack_cache_*
+models/sentence-transformers/
