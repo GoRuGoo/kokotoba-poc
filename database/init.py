@@ -182,6 +182,23 @@ class DatabaseManager:
             }
         ]
 
+        # アプリ起動のたびに同じデモデータが増えないようにする。
+        with self.connect() as conn:
+            existing_source_texts = {
+                row["source_text"]
+                for row in conn.execute(
+                    "SELECT source_text FROM long_term_memory"
+                ).fetchall()
+            }
+        demo_records = [
+            record
+            for record in demo_records
+            if record["source_text"] not in existing_source_texts
+        ]
+        if not demo_records:
+            print("デモデータは既に登録されています。")
+            return
+
         model = self._load_embedding_model()
 
         # E5モデルの要件：保存するドキュメントには "passage: " を付ける

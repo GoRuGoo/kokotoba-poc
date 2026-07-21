@@ -45,13 +45,21 @@ class LiteRTLMClient(LLMClient):
             raise
 
     def generate(self, prompt: str) -> str:
-        """同期APIでプロンプトを送り、レスポンス中のテキストだけを返す。"""
+        """独立したConversationで同期生成し、テキストだけを返す。"""
         if not prompt.strip():
             raise ValueError("prompt must not be empty or whitespace only")
 
         self._ensure_started()
-        response = self._conversation.send_message(prompt)
-        return self._extract_text(response)
+        conversation = self._conversation
+        try:
+            response = conversation.send_message(prompt)
+            return self._extract_text(response)
+        finally:
+            # 内部プロンプトや前回の質問が次の推論へ混ざらないようにする。
+            self._close_resource(conversation)
+            self._conversation = None
+            if self._engine is not None:
+                self._conversation = self._engine.create_conversation()
 
     def close(self) -> None:
         """Conversation、Engine の順にリソースを安全に解放する。"""

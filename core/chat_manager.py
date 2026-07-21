@@ -25,7 +25,7 @@ class ChatManager:
         self,
         user_input: str,
         user_location_input: str,
-    ) -> None:
+    ) -> list[str]:
         # 短期記憶に会話内容を保存
         self.memory_consolidator.record_short_term_memory(
             ShortTermMemoryRecord(
@@ -40,7 +40,25 @@ class ChatManager:
             )
         )
 
-        self.rag.generate_rag_response(user_input, user_location_input)
+        return self.rag.generate_rag_response(
+            user_input,
+            user_location_input,
+        )
+
+    def record_selected_card(
+        self,
+        user_input: str,
+        user_location_input: str,
+        shown_cards: list[str],
+        selected_card: str,
+    ) -> None:
+        """ユーザーが実際に選んだカードを記録する。"""
+        self.rag.record_selected_card(
+            user_input=user_input,
+            user_location=user_location_input,
+            shown_cards=shown_cards,
+            selected_card=selected_card,
+        )
 
     def finish_session(self) -> None:
         return
